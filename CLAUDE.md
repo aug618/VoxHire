@@ -36,9 +36,11 @@ AI 面试官 — 一个支持实时语音+虚拟形象交互的 AI 面试系统�
 | 对话记忆 | 混合策略（固定头 + 摘要 + 滑动窗口）|
 | STT 方案 | 先句子级，后流式 |
 | 对话管道 | LLM 流式输出 + TTS 分段合成 |
+| Python 环境 | uv 管理，项目级 .venv + pyproject.toml |
 ## 技术架构（方案阶段，未定稿）
 
 - **前端：** React/Next.js + MediaStream API（音频）
 - **后端：** Python FastAPI + WebSocket + 会话管理
 - **AI 技术栈：** STT（Whisper）、LLM（Ollama 本地 / API 云端）、TTS（Edge-TTS / Coqui）
+- **Python 环境：** uv 管理虚拟环境（.venv）和依赖（pyproject.toml），不用全局 conda
 - **核心原则：** 各组件可独立替换（本地方案 ↔ 云端方案）

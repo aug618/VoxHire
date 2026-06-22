@@ -6,7 +6,7 @@
 
 **架构：** React/Next.js 前端（准备页/面试页/报告页）通过 REST + WebSocket 与 Python/FastAPI 后端通信，后端编排 STT -> LLM 流式生成 -> TTS 分段合成管道（边生成边播放），采用混合记忆策略。
 
-**技术栈：** React 18 / Next.js 14 / TypeScript / Tailwind / Python 3.11+ / FastAPI / faster-whisper / Ollama / Edge-TTS
+**技术栈：** React 18 / Next.js 14 / TypeScript / Tailwind / Python 3.12+ / FastAPI / faster-whisper / Ollama / Edge-TTS / uv（Python 环境管理）
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 文件结构
 
-backend/ (FastAPI): main.py, config.py, models/interview.py, routes/report.py
+backend/ (FastAPI): main.py, config.py, pyproject.toml, models/interview.py, routes/report.py
 services/: stt.py, llm.py, tts.py, memory.py, state_machine.py, report.py
 utils/prompts.py, tests/
 
@@ -34,13 +34,17 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ---
 
-## 任务 0.1：后端项目初始化
+## 任务 0.1：后端项目初始化（uv 环境）
 
-**创建文件：** `backend/requirements.txt`、`backend/app/__init__.py`、`backend/app/config.py`、`backend/tests/__init__.py`
+**创建文件：** `backend/pyproject.toml`、`backend/app/__init__.py`、`backend/app/config.py`、`backend/tests/__init__.py`
 
-- [ ] 创建 requirements.txt：fastapi, uvicorn, websockets, faster-whisper, edge-tts, httpx, pydantic, pydantic-settings, pytest, pytest-asyncio
-- [ ] 创建 config.py：Settings 类，含 ollama_host、whisper_model/device/compute_type、tts_voice、max_interview_minutes=30、max_followups=2、sliding_window_rounds=8
-- [ ] 安装依赖并在 git 提交："chore: 初始化后端项目，添加配置与依赖"
+- [ ] 在 backend/ 目录执行 `uv init --no-readme`，生成 pyproject.toml（requires-python = ">=3.12"）
+- [ ] 执行 `uv add fastapi uvicorn[standard] websockets faster-whisper edge-tts httpx pydantic pydantic-settings` 添加依赖
+- [ ] 执行 `uv add --dev pytest pytest-asyncio` 添加开发依赖
+- [ ] 创建 config.py：Settings 类（继承 pydantic-settings BaseSettings），含 ollama_host、whisper_model/device/compute_type、tts_voice、max_interview_minutes=30、max_followups=2、sliding_window_rounds=8
+- [ ] 创建 backend/app/__init__.py 和 backend/tests/__init__.py（空文件）
+- [ ] 执行 `uv run pytest` 验证环境正常（无测试或 0 collected 即可）
+- [ ] git 提交："chore: 初始化后端项目，使用 uv + pyproject.toml 管理依赖与配置"
 
 ---
 
