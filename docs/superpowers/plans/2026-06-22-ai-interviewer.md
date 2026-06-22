@@ -1,29 +1,29 @@
-﻿# AI Interviewer Implementation Plan
+﻿# AI 面试官 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
+> **给执行 agent：** 使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 来逐任务执行。步骤使用 checkbox (`- [ ]`) 语法跟踪。
 
-**Goal:** Build MVP AI interview system with voice + virtual avatar, supporting technical and behavioral interviews with 7-dimension reports.
+**目标：** 构建一个语音 + 虚拟形象实时交互的 AI 面试官 MVP，支持技术面和行为面，产出 7 维评估报告。
 
-**Architecture:** React/Next.js frontend (prep/interview/report pages) via REST+WebSocket to Python/FastAPI backend orchestrating STT->LLM->TTS pipeline with hybrid memory.
+**架构：** React/Next.js 前端（准备页/面试页/报告页）通过 REST + WebSocket 与 Python/FastAPI 后端通信，后端编排 STT -> LLM -> TTS 管道，采用混合记忆策略。
 
-**Tech Stack:** React 18 / Next.js 14 / TypeScript / Tailwind / Python 3.11+ / FastAPI / faster-whisper / Ollama / Edge-TTS
+**技术栈：** React 18 / Next.js 14 / TypeScript / Tailwind / Python 3.11+ / FastAPI / faster-whisper / Ollama / Edge-TTS
 
 ---
 
-## Phases
+## 实现阶段
 
-| Phase | Tasks | Description |
-|-------|-------|-------------|
-| 0 | 0.1-0.2 | Project scaffolding |
-| 1 | 1.1-1.2 | Backend core: models + state machine |
-| 2 | 2.1-2.4 | AI pipeline: prompts, STT, LLM, TTS |
-| 3 | 3.1 | Memory management |
+| 阶段 | 任务 | 描述 |
+|------|------|------|
+| 0 | 0.1-0.2 | 项目脚手架（前后端初始化） |
+| 1 | 1.1-1.2 | 后端核心：数据模型 + 状态机 |
+| 2 | 2.1-2.4 | AI 管道：Prompt、STT、LLM、TTS |
+| 3 | 3.1 | 记忆管理（混合策略） |
 | 4 | 4.1-4.2 | REST API + WebSocket |
-| 5 | 5.1-5.10 | Frontend: types, hooks, components, pages |
+| 5 | 5.1-5.10 | 前端：类型、hooks、组件、页面 |
 
 ---
 
-## File Structure
+## 文件结构
 
 backend/ (FastAPI): main.py, config.py, models/interview.py, routes/report.py
 services/: stt.py, llm.py, tts.py, memory.py, state_machine.py, report.py
@@ -34,173 +34,245 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ---
 
-## Task 0.1: Backend scaffolding
+## 任务 0.1：后端项目初始化
 
-Create backend/requirements.txt (fastapi, uvicorn, websockets, faster-whisper, edge-tts, httpx, pydantic, pydantic-settings, pytest, pytest-asyncio).
-Create backend/app/config.py with Settings class (ollama_host, whisper_model/device/compute_type, tts_voice, max_interview_minutes=30, max_followups=2, sliding_window_rounds=8).
-Commit: "chore: scaffold backend project"
+**创建文件：** `backend/requirements.txt`、`backend/app/__init__.py`、`backend/app/config.py`、`backend/tests/__init__.py`
 
----
-
-## Task 0.2: Frontend scaffolding
-
-Create package.json (next, react, recharts + tailwindcss, typescript dev deps).
-next.config.js with rewrites proxy /api/* -> localhost:8000.
-Create tsconfig.json, tailwind.config.ts, postcss.config.js.
-Create layout.tsx (zh-CN lang, dark theme #0f1117/#e4e4e7) and globals.css.
-Commit: "chore: scaffold frontend project"
+- [ ] 创建 requirements.txt：fastapi, uvicorn, websockets, faster-whisper, edge-tts, httpx, pydantic, pydantic-settings, pytest, pytest-asyncio
+- [ ] 创建 config.py：Settings 类，含 ollama_host、whisper_model/device/compute_type、tts_voice、max_interview_minutes=30、max_followups=2、sliding_window_rounds=8
+- [ ] 安装依赖并在 git 提交："chore: 初始化后端项目，添加配置与依赖"
 
 ---
 
-## Task 1.1: Pydantic models
+## 任务 0.2：前端项目初始化
 
-backend/app/models/interview.py: Enums (InterviewType, Difficulty, InterviewState), Models (InterviewConfig, QuestionRecord, InterviewSession).
-Test: config defaults (MIXED/INTERMEDIATE), session initial state (INIT, empty questions).
-Commit: "feat: add Pydantic data models"
+**创建文件：** package.json、next.config.js、tsconfig.json、tailwind.config.ts、postcss.config.js、layout.tsx、globals.css
 
----
-
-## Task 1.2: State machine
-
-backend/app/services/state_machine.py: VALID_TRANSITIONS dict, InterviewStateMachine class with transition_to() raising StateTransitionError.
-Test: initial state, valid transition, invalid raises, full flow (INIT->OPENING->QA_LOOP->CLOSING->REPORT->DONE).
-Commit: "feat: add interview state machine"
+- [ ] 创建 package.json：next, react, recharts 依赖，tailwindcss, typescript 开发依赖
+- [ ] 配置 next.config.js：rewrites 代理 /api/* -> localhost:8000
+- [ ] 创建 tsconfig.json、tailwind.config.ts、postcss.config.js
+- [ ] 创建 layout.tsx（zh-CN 语言，深色主题 #0f1117/#e4e4e7）和 globals.css
+- [ ] git 提交："chore: 初始化前端项目，使用 Next.js + Tailwind + TypeScript"
 
 ---
 
-## Task 2.1: Prompt templates
+## 任务 1.1：Pydantic 数据模型
 
-backend/app/utils/prompts.py: SYSTEM_PROMPT_TEMPLATE (interview info, responsibilities, behavioral rules, memory context), build_system_prompt(). REPORT_PROMPT_TEMPLATE (7-dimension scoring with anchors, JSON output), build_report_prompt().
-Commit: "feat: add prompt templates"
+**创建文件：** `backend/app/models/interview.py`、`backend/tests/test_models.py`
 
----
-
-## Task 2.2: STT service
-
-backend/app/services/stt.py: STTService with lazy faster-whisper loading, transcribe(audio_bytes) writes temp WAV, transcribes, returns text.
-Test: silent WAV helper, transcribe returns str.
-Commit: "feat: add STT service"
+- [ ] 枚举：InterviewType（technical/behavioral/mixed）、Difficulty（junior/intermediate/senior）、InterviewState（init/opening/qa_loop/closing/report/done）
+- [ ] 模型：InterviewConfig（岗位/技术栈/难度/面试类型/模型配置）、QuestionRecord（题目/回答/追问/评分）、InterviewSession（ID/配置/状态/问题列表）
+- [ ] 先写测试：配置默认值（MIXED/INTERMEDIATE）、会话初始状态（INIT/空问题列表）
+- [ ] 实现模型，验证 2 个测试通过
+- [ ] git 提交："feat: 添加 Pydantic 面试会话数据模型"
 
 ---
 
-## Task 2.3: LLM service
+## 任务 1.2：面试状态机
 
-backend/app/services/llm.py: LLMService(provider, api_key) supporting Ollama /api/chat and OpenAI /chat/completions. async chat(system_prompt, messages, temperature, max_tokens).
-Test: init defaults, _build_chat_request structure.
-Commit: "feat: add LLM service"
+**创建文件：** `backend/app/services/state_machine.py`、`backend/tests/test_state_machine.py`
 
----
-
-## Task 2.4: TTS service
-
-backend/app/services/tts.py: TTSService using Edge-TTS Communicate stream, synthesize(text) returns MP3 bytes.
-Test: valid text returns bytes, empty text returns empty.
-Commit: "feat: add TTS service"
+- [ ] VALID_TRANSITIONS 字典：INIT->OPENING, OPENING->QA_LOOP, QA_LOOP->{QA_LOOP, CLOSING}, CLOSING->REPORT, REPORT->DONE
+- [ ] InterviewStateMachine 类：transition_to() 校验转换合法性，非法抛出 StateTransitionError
+- [ ] 测试：初始状态、合法跳转、非法跳转抛异常、完整流程（INIT->OPENING->QA_LOOP->CLOSING->REPORT->DONE）
+- [ ] git 提交："feat: 添加面试状态机，含合法转换校验"
 
 ---
 
-## Task 3.1: Memory manager
+## 任务 2.1：Prompt 模板
 
-backend/app/services/memory.py: MemoryContext (fixed_header, stage_summaries, recent_rounds), MemoryManager with add_round(), summarize_stage(), get_context(), format_for_prompt(). Sliding window keeps last N rounds.
-Test: init, add_round, sliding window (3/5 rounds), summarize_stage.
-Commit: "feat: add hybrid memory manager"
+**创建文件：** `backend/app/utils/prompts.py`
 
----
-
-## Task 4.1: FastAPI + WebSocket
-
-backend/app/main.py: POST /interview/start creates session, returns session_id. GET /interview/{id}/status. WebSocket /ws/{id} runs 3-phase pipeline (OPENING -> QA_LOOP -> CLOSING). Uses StateMachine, MemoryManager, dynamic prompt rebuilding. Receives audio bytes -> STT -> LLM -> TTS -> sends text+audio back.
-Commit: "feat: add FastAPI entry point with WebSocket pipeline"
+- [ ] SYSTEM_PROMPT_TEMPLATE：面试信息区 + 职责说明（开场白/核心问答/追问策略/结束语）+ 行为准则 + 当前记忆区
+- [ ] build_system_prompt(config, memory_context)：填充岗位、技术栈、难度、面试类型、简历等字段
+- [ ] REPORT_PROMPT_TEMPLATE：要求 LLM 对 7 个维度打分（4 技术 + 3 行为），含行为锚定描述，返回 JSON
+- [ ] build_report_prompt(config, qa_records)：填充面试信息与对话记录
+- [ ] git 提交："feat: 添加面试系统和报告生成的 Prompt 模板"
 
 ---
 
-## Task 4.2: Report endpoint
+## 任务 2.2：STT 语音识别服务
 
-backend/app/routes/report.py: GET /report/{session_id} calls generate_report(session).
-Register route in main.py.
-Commit: "feat: add report API endpoint"
+**创建文件：** `backend/app/services/stt.py`、`backend/tests/test_stt.py`
 
----
-
-## Task 5.1: TypeScript types
-
-frontend/src/types/index.ts: InterviewType, Difficulty, InterviewConfig, InterviewSession, DimensionScore, PerQuestionReview, ReportData, WSMessage, AvatarState.
-Commit: "feat: add TypeScript type definitions"
+- [ ] STTService 类：惰性加载 faster-whisper 模型（可配置 model/device/compute_type）
+- [ ] transcribe(audio_bytes)：写入临时 WAV，调模型转写，返回文本
+- [ ] 测试：用静音 WAV 生成函数验证接口正常
+- [ ] git 提交："feat: 添加基于 faster-whisper 的句子级语音识别服务"
 
 ---
 
-## Task 5.2: REST API client
+## 任务 2.3：LLM 大模型服务
 
-frontend/src/lib/api.ts: startInterview(config) -> InterviewSession, getReport(sessionId) -> ReportData.
-Commit: "feat: add REST API client"
+**创建文件：** `backend/app/services/llm.py`、`backend/tests/test_llm.py`
 
----
-
-## Task 5.3: WebSocket hook
-
-frontend/src/hooks/useWebSocket.ts: connects ws://localhost:8000/ws/{id}, returns { isConnected, messages, audioChunks, sendAudio, clearMessages }.
-Commit: "feat: add WebSocket hook"
+- [ ] LLMService(provider, api_key)：支持 Ollama（/api/chat）和 OpenAI 兼容（/chat/completions）两种后端
+- [ ] async chat(system_prompt, messages, temperature, max_tokens)：构建完整消息列表，分发到对应后端，返回助手回复文本
+- [ ] 测试：初始化默认值、_build_chat_request 消息结构
+- [ ] git 提交："feat: 添加 LLM 服务，支持 Ollama 本地和 OpenAI 兼容 API"
 
 ---
 
-## Task 5.4: Audio hooks
+## 任务 2.4：TTS 语音合成服务
 
-useAudioCapture: MediaRecorder API, returns { isRecording, startRecording, stopRecording() -> Blob }.
-useAudioPlayback: AudioContext decode+play on new chunks.
-Commit: "feat: add audio capture and playback hooks"
+**创建文件：** `backend/app/services/tts.py`、`backend/tests/test_tts.py`
 
----
-
-## Task 5.5: Avatar component
-
-frontend/src/components/Avatar.tsx: 192px circular avatar, 3 Tailwind-animated states (idle/thinking/speaking) with emoji + Chinese labels + pulsing borders.
-Commit: "feat: add virtual avatar component"
+- [ ] TTSService 类：使用 Edge-TTS Communicate 流式合成
+- [ ] synthesize(text)：空文本返回空 bytes，正常文本返回 MP3 音频 bytes
+- [ ] 测试：有效文本返回 bytes、空文本返回空 bytes
+- [ ] git 提交："feat: 添加基于 Edge-TTS 的中文语音合成服务"
 
 ---
 
-## Task 5.6: Subtitle/Recorder/Player
+## 任务 3.1：混合记忆管理
 
-SubtitleDisplay.tsx: scrollable box, AI messages left green, user right blue bubbles, errors centered red.
-AudioRecorder.tsx: circular push-to-talk button with mic SVG, toggles recording.
-AudioPlayer.tsx: hidden auto-play via useAudioPlayback.
-Commit: "feat: add subtitle, recorder, player components"
+**创建文件：** `backend/app/services/memory.py`、`backend/tests/test_memory.py`
 
----
-
-## Task 5.7: Prep page
-
-PrepForm.tsx: position input, tech stack chips, difficulty/type/model selectors. Submits via startInterview API.
-page.tsx: title "AI Interviewer" + subtitle + PrepForm, navigates to /interview?session={id}.
-Commit: "feat: add interview prep page"
+- [ ] MemoryContext：fixed_header（面试信息）、stage_summaries（阶段摘要）、recent_rounds（最近对话）
+- [ ] MemoryManager(config, max_rounds=8)：add_round(q, a) 添加问答、summarize_stage(name) 生成阶段摘要、get_context() 返回带滑动窗口的上下文、format_for_prompt() 构建结构化字符串
+- [ ] 测试：初始化、添加问答、滑动窗口（只保留最后 3/5 轮）、阶段摘要
+- [ ] git 提交："feat: 添加混合记忆管理器，支持固定头 + 阶段摘要 + 滑动窗口"
 
 ---
 
-## Task 5.8: Interview page
+## 任务 4.1：FastAPI 入口 + WebSocket 面试管道
 
-interview/page.tsx: reads session param, WebSocket connection. Shows connection indicator, Avatar, SubtitleDisplay, AudioRecorder, "结束面试" link to report.
-Commit: "feat: add interview in-progress page"
+**创建文件：** `backend/app/main.py`
 
----
-
-## Task 5.9: Report page
-
-backend/app/services/report.py: generate_report(session) uses REPORT_PROMPT_TEMPLATE, parses JSON response.
-report/page.tsx: recharts RadarChart (7 dims), dimension cards, per-question review, summary.
-Commit: "feat: add report generation and page"
-
----
-
-## Task 5.10: README
-
-README.md: features, architecture diagram, quick start (backend + frontend commands), license (MIT).
-Commit: "docs: add project README"
+- [ ] POST /interview/start：创建 InterviewSession，存内存字典，返回 session_id
+- [ ] GET /interview/{id}/status：返回当前状态和问题数
+- [ ] WebSocket /ws/{id}：三段式管道
+  - 开场白（OPENING）：LLM 生成自我介绍 -> TTS 合成 -> 发送文本 + 音频
+  - 核心问答循环（QA_LOOP）：接收音频 bytes -> STT 转写 -> 追加聊天历史 -> LLM（动态 Prompt + 记忆）-> TTS -> 回发文本 + 音频
+  - 结束（断连时 CLOSING）：LLM 生成结束语 -> 发送
+- [ ] 使用 InterviewStateMachine 控制阶段、MemoryManager 管理上下文
+- [ ] git 提交："feat: 添加 FastAPI 入口和 WebSocket 面试管道"
 
 ---
 
-## Plan Self-Review
+## 任务 4.2：报告接口
 
-Spec coverage: All 6 core modules covered. No TBD/TODO. Types aligned between Python models and TypeScript interfaces.
+**创建文件：** `backend/app/routes/report.py`，修改 `backend/app/main.py`
+
+- [ ] GET /report/{session_id}：获取会话，调用 generate_report()，返回 JSON 报告
+- [ ] 在 main.py 注册路由
+- [ ] git 提交："feat: 添加评估报告 API 接口"
 
 ---
 
-*Plan complete. Ready for execution handoff.*
+## 任务 5.1：TypeScript 类型定义
+
+**创建文件：** `frontend/src/types/index.ts`
+
+- [ ] 类型接口：InterviewType、Difficulty、InterviewConfig、InterviewSession、DimensionScore、PerQuestionReview、ReportData、WSMessage、AvatarState
+- [ ] 与 Pydantic 模型对齐
+- [ ] git 提交："feat: 添加 TypeScript 类型定义"
+
+---
+
+## 任务 5.2：REST API 客户端
+
+**创建文件：** `frontend/src/lib/api.ts`
+
+- [ ] startInterview(config)：POST /api/interview/start -> InterviewSession
+- [ ] getReport(sessionId)：GET /api/report/{id} -> ReportData
+- [ ] git 提交："feat: 添加 REST API 客户端"
+
+---
+
+## 任务 5.3：WebSocket Hook
+
+**创建文件：** `frontend/src/hooks/useWebSocket.ts`
+
+- [ ] useWebSocket(sessionId)：连接 ws://localhost:8000/ws/{id}
+- [ ] 返回 { isConnected, messages, audioChunks, sendAudio, clearMessages }
+- [ ] 处理 JSON 文本消息和 binary 音频数据，组件卸载时自动关闭
+- [ ] git 提交："feat: 添加实时音视频通信 WebSocket Hook"
+
+---
+
+## 任务 5.4：音频采集与播放 Hook
+
+**创建文件：** `frontend/src/hooks/useAudioCapture.ts`、`frontend/src/hooks/useAudioPlayback.ts`
+
+- [ ] useAudioCapture：getUserMedia + MediaRecorder API，返回 { isRecording, startRecording, stopRecording() -> Blob }
+- [ ] useAudioPlayback：监听 audioChunks 数组新增，AudioContext 解码后自动播放
+- [ ] git 提交："feat: 添加音频采集和播放 Hook"
+
+---
+
+## 任务 5.5：虚拟形象组件
+
+**创建文件：** `frontend/src/components/Avatar.tsx`
+
+- [ ] 192px 圆形头像，3 种 Tailwind 动画状态：
+  - idle：灰色边框、微笑 emoji、"等待中"
+  - thinking：蓝色脉动边框、思考 emoji、"思考中"
+  - speaking：绿色边框 + ping 光环动画、讲话 emoji、"讲话中"
+- [ ] git 提交："feat: 添加虚拟形象组件，含 idle/thinking/speaking 三态"
+
+---
+
+## 任务 5.6：字幕/录音/播放组件
+
+**创建文件：** SubtitleDisplay.tsx、AudioRecorder.tsx、AudioPlayer.tsx
+
+- [ ] SubtitleDisplay：可滚动容器，AI 消息左对齐绿色，用户语音右对齐蓝色气泡，错误居中红色
+- [ ] AudioRecorder：圆形按下说话按钮，使用麦克风 SVG 图标，切换录音状态
+- [ ] AudioPlayer：隐藏组件，通过 useAudioPlayback 自动播放 TTS 音频
+- [ ] git 提交："feat: 添加字幕、录音按钮、音频播放组件"
+
+---
+
+## 任务 5.7：面试准备页
+
+**创建文件：** PrepForm.tsx，修改 page.tsx
+
+- [ ] PrepForm：岗位名称输入、技术栈多选标签（Python/JS/Go/Java/Rust/C++/TS/Ruby/Kotlin/Swift）、难度三段按钮、面试类型选择器、模型下拉框
+- [ ] 提交调用 startInterview API，跳转到 /interview?session={id}
+- [ ] page.tsx：标题 "AI Interviewer" + 副标题 + PrepForm 组件
+- [ ] git 提交："feat: 添加面试准备页，含配置表单"
+
+---
+
+## 任务 5.8：面试进行页
+
+**创建文件：** `frontend/src/app/interview/page.tsx`
+
+- [ ] 从 URL 参数读取 session ID，建立 WebSocket 连接
+- [ ] 布局：连接状态指示灯、虚拟形象（Avatar）、字幕区（SubtitleDisplay）、隐藏音频播放器、录音按钮 + "结束面试"链接
+- [ ] 管理头像状态：发送音频时 thinking -> 超时恢复 idle
+- [ ] git 提交："feat: 添加面试进行页，含虚拟形象、字幕和录音交互"
+
+---
+
+## 任务 5.9：评估报告页
+
+**创建文件：** `backend/app/services/report.py`、`frontend/src/app/report/page.tsx`
+
+- [ ] 报告服务 generate_report(session)：构建 QA 记录，发送 REPORT_PROMPT_TEMPLATE 给 LLM，解析 JSON 响应
+- [ ] 报告页：综合评分（大字 /5.0）、7 维 recharts 雷达图、逐维度详情卡片（分数+锚定描述+点评）、逐题回顾（亮点/改进点对比）、总结建议文字
+- [ ] git 提交："feat: 添加报告生成服务和评估报告页面，含雷达图"
+
+---
+
+## 任务 5.10：项目 README
+
+**创建文件：** README.md
+
+- [ ] 项目简介、功能列表、架构图、快速启动（后端 + 前端命令）、开源协议（MIT）
+- [ ] git 提交："docs: 添加项目 README，含快速启动说明"
+
+---
+
+## 计划自审
+
+**Spec 覆盖：** 设计文档 6 个核心模块全部有对应任务 — 状态机(1.2)、AI 管道(2.1-2.4)、记忆管理(3.1)、REST/WebSocket(4.1-4.2)、虚拟形象(5.5)、评估报告(5.9)。非功能需求通过 config.py 模块化服务设计和本地优先架构体现。
+
+**占位符检查：** 无 TBD、TODO 或不完整步骤。每个步骤都有精确的文件路径和测试预期。
+
+**类型一致性：** Python Pydantic 模型与 TypeScript 接口对齐。WebSocket 消息格式在 main.py 和 useWebSocket.ts 之间保持一致。
+
+---
+
+*计划完成，等待执行握手。*
