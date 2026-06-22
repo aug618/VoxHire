@@ -4,7 +4,7 @@
 
 **目标：** 构建一个语音 + 虚拟形象实时交互的 AI 面试官 MVP，支持技术面和行为面，产出 7 维评估报告。
 
-**架构：** React/Next.js 前端（准备页/面试页/报告页）通过 REST + WebSocket 与 Python/FastAPI 后端通信，后端编排 STT -> LLM -> TTS 管道，采用混合记忆策略。
+**架构：** React/Next.js 前端（准备页/面试页/报告页）通过 REST + WebSocket 与 Python/FastAPI 后端通信，后端编排 STT -> LLM 流式生成 -> TTS 分段合成管道（边生成边播放），采用混合记忆策略。
 
 **技术栈：** React 18 / Next.js 14 / TypeScript / Tailwind / Python 3.11+ / FastAPI / faster-whisper / Ollama / Edge-TTS
 
@@ -16,7 +16,7 @@
 |------|------|------|
 | 0 | 0.1-0.2 | 项目脚手架（前后端初始化） |
 | 1 | 1.1-1.2 | 后端核心：数据模型 + 状态机 |
-| 2 | 2.1-2.4 | AI 管道：Prompt、STT、LLM、TTS |
+| 2 | 2.1-2.4 | AI 管道：Prompt、STT、LLM（含流式）、TTS（含分段合成） |
 | 3 | 3.1 | 记忆管理（混合策略） |
 | 4 | 4.1-4.2 | REST API + WebSocket |
 | 5 | 5.1-5.10 | 前端：类型、hooks、组件、页面 |
@@ -102,25 +102,29 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ---
 
-## 任务 2.3：LLM 大模型服务
+## 任务 2.3：LLM 大模型服务（含流式输出）
 
 **创建文件：** `backend/app/services/llm.py`、`backend/tests/test_llm.py`
 
 - [ ] LLMService(provider, api_key)：支持 Ollama（/api/chat）和 OpenAI 兼容（/chat/completions）两种后端
-- [ ] async chat(system_prompt, messages, temperature, max_tokens)：构建完整消息列表，分发到对应后端，返回助手回复文本
-- [ ] 测试：初始化默认值、_build_chat_request 消息结构
-- [ ] git 提交："feat: 添加 LLM 服务，支持 Ollama 本地和 OpenAI 兼容 API"
+- [ ] async chat(system_prompt, messages, temperature, max_tokens)：非流式接口，返回完整文本（用于报告生成等场景）
+- [ ] async chat_stream(system_prompt, messages, temperature, max_tokens)：流式接口，async generator 逐 token 产出文本（用于实时对话管道）
+- [ ] 流式实现：Ollama 使用 stream=True 参数，OpenAI 兼容 API 使用 stream=True + SSE 解析
+- [ ] 测试：初始化默认值、_build_chat_request 消息结构、chat_stream 返回 async generator
+- [ ] git 提交："feat: 添加 LLM 服务，支持 Ollama/OpenAI 兼容 API 及流式输出"
 
 ---
 
-## 任务 2.4：TTS 语音合成服务
+## 任务 2.4：TTS 语音合成服务（支持分段合成）
 
 **创建文件：** `backend/app/services/tts.py`、`backend/tests/test_tts.py`
 
 - [ ] TTSService 类：使用 Edge-TTS Communicate 流式合成
-- [ ] synthesize(text)：空文本返回空 bytes，正常文本返回 MP3 音频 bytes
-- [ ] 测试：有效文本返回 bytes、空文本返回空 bytes
-- [ ] git 提交："feat: 添加基于 Edge-TTS 的中文语音合成服务"
+- [ ] synthesize(text)：空文本返回空 bytes，正常文本返回 MP3 音频 bytes（用于完整文本场景）
+- [ ] async synthesize_stream(text_chunks: AsyncIterator[str])：接收文本块异步迭代器，逐块合成并 yield 音频 bytes（用于流式对话管道）
+- [ ] 句子边界切分工具函数 split_sentences(text)：按句号/问号/感叹号切分，供 WebSocket 管道调用
+- [ ] 测试：有效文本返回 bytes、空文本返回空 bytes、synthesize_stream 返回 async generator
+- [ ] git 提交："feat: 添加基于 Edge-TTS 的语音合成服务，支持流式分段合成"
 
 ---
 
@@ -135,18 +139,22 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ---
 
-## 任务 4.1：FastAPI 入口 + WebSocket 面试管道
+## 任务 4.1：FastAPI 入口 + WebSocket 面试管道（流式分段合成）
 
 **创建文件：** `backend/app/main.py`
 
 - [ ] POST /interview/start：创建 InterviewSession，存内存字典，返回 session_id
 - [ ] GET /interview/{id}/status：返回当前状态和问题数
-- [ ] WebSocket /ws/{id}：三段式管道
-  - 开场白（OPENING）：LLM 生成自我介绍 -> TTS 合成 -> 发送文本 + 音频
-  - 核心问答循环（QA_LOOP）：接收音频 bytes -> STT 转写 -> 追加聊天历史 -> LLM（动态 Prompt + 记忆）-> TTS -> 回发文本 + 音频
+- [ ] WebSocket /ws/{id}：流式管道
+  - 开场白（OPENING）：LLM chat_stream 流式生成自我介绍 -> 按句子切分 -> TTS synthesize_stream 逐段合成 -> 逐段发送文本 + 音频
+  - 核心问答循环（QA_LOOP）：接收音频 bytes -> STT 转写 -> 追加聊天历史 -> LLM chat_stream（动态 Prompt + 记忆）-> 按句子边界切分 token 流 -> TTS synthesize_stream 逐段合成 -> 逐段回发文本 + 音频
   - 结束（断连时 CLOSING）：LLM 生成结束语 -> 发送
+- [ ] 流式管道核心逻辑：
+  - sentence_buffer：累积 LLM token，遇到句号/问号/感叹号时切出一个句子
+  - 每个句子立即送入 TTS synthesize_stream，合成完毕即通过 WebSocket 发送 binary 音频帧
+  - 同时发送 JSON 文本消息（type: "ai_text", text: 当前句子）供前端显示字幕
 - [ ] 使用 InterviewStateMachine 控制阶段、MemoryManager 管理上下文
-- [ ] git 提交："feat: 添加 FastAPI 入口和 WebSocket 面试管道"
+- [ ] git 提交："feat: 添加 FastAPI 入口和 WebSocket 流式面试管道"
 
 ---
 
@@ -180,24 +188,34 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ---
 
-## 任务 5.3：WebSocket Hook
+## 任务 5.3：WebSocket Hook（支持流式消息）
 
 **创建文件：** `frontend/src/hooks/useWebSocket.ts`
 
 - [ ] useWebSocket(sessionId)：连接 ws://localhost:8000/ws/{id}
-- [ ] 返回 { isConnected, messages, audioChunks, sendAudio, clearMessages }
-- [ ] 处理 JSON 文本消息和 binary 音频数据，组件卸载时自动关闭
-- [ ] git 提交："feat: 添加实时音视频通信 WebSocket Hook"
+- [ ] 返回 { isConnected, messages, audioQueue, sendAudio, clearMessages }
+- [ ] 处理多种 JSON 消息类型：
+  - type: "ai_text" — AI 回复文本，逐句追加到 messages
+  - type: "user_text" — STT 识别结果，追加到 messages
+  - type: "state_change" — 面试状态变更通知
+  - type: "error" — 错误信息
+- [ ] 处理 binary 音频帧：收到后追加到 audioQueue 数组，触发前端播放
+- [ ] 组件卸载时自动关闭连接
+- [ ] git 提交："feat: 添加实时通信 WebSocket Hook，支持流式文本和音频"
 
 ---
 
-## 任务 5.4：音频采集与播放 Hook
+## 任务 5.4：音频采集与播放 Hook（含播放队列）
 
 **创建文件：** `frontend/src/hooks/useAudioCapture.ts`、`frontend/src/hooks/useAudioPlayback.ts`
 
 - [ ] useAudioCapture：getUserMedia + MediaRecorder API，返回 { isRecording, startRecording, stopRecording() -> Blob }
-- [ ] useAudioPlayback：监听 audioChunks 数组新增，AudioContext 解码后自动播放
-- [ ] git 提交："feat: 添加音频采集和播放 Hook"
+- [ ] useAudioPlayback：维护音频播放队列（FIFO），监听 audioQueue 数组新增
+  - 队列机制：新音频块入队，当前无播放则立即解码播放，否则排队等待
+  - AudioContext 解码 -> AudioBufferSourceNode 播放 -> onended 回调触发下一段
+  - 返回 { isPlaying, playNext, clearQueue }
+  - 支持播放状态回调：onPlayStart（切换 avatar 为 speaking）、onPlayEnd（切回 idle）
+- [ ] git 提交："feat: 添加音频采集和队列播放 Hook"
 
 ---
 
@@ -267,11 +285,13 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 ## 计划自审
 
-**Spec 覆盖：** 设计文档 6 个核心模块全部有对应任务 — 状态机(1.2)、AI 管道(2.1-2.4)、记忆管理(3.1)、REST/WebSocket(4.1-4.2)、虚拟形象(5.5)、评估报告(5.9)。非功能需求通过 config.py 模块化服务设计和本地优先架构体现。
+**Spec 覆盖：** 设计文档 6 个核心模块全部有对应任务 — 状态机(1.2)、AI 管道含流式(2.1-2.4)、记忆管理(3.1)、REST/WebSocket流式管道(4.1-4.2)、虚拟形象(5.5)、评估报告(5.9)。非功能需求通过 config.py 模块化服务设计和本地优先架构体现。
+
+**流式管道一致性：** LLM chat_stream(2.3) -> TTS synthesize_stream(2.4) -> WebSocket 流式分段发送(4.1) -> 前端 audioQueue 队列播放(5.4)，全链路已对齐。
 
 **占位符检查：** 无 TBD、TODO 或不完整步骤。每个步骤都有精确的文件路径和测试预期。
 
-**类型一致性：** Python Pydantic 模型与 TypeScript 接口对齐。WebSocket 消息格式在 main.py 和 useWebSocket.ts 之间保持一致。
+**类型一致性：** Python Pydantic 模型与 TypeScript 接口对齐。WebSocket 消息格式（JSON type 字段 + binary 音频）在 main.py 和 useWebSocket.ts 之间保持一致。
 
 ---
 
