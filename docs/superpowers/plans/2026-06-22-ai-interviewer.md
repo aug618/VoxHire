@@ -297,6 +297,12 @@ hooks/{useWebSocket,useAudioCapture,useAudioPlayback}, lib/api.ts, types/index.t
 
 **类型一致性：** Python Pydantic 模型与 TypeScript 接口对齐。WebSocket 消息格式（JSON type 字段 + binary 音频）在 main.py 和 useWebSocket.ts 之间保持一致。
 
+**体验设计预留：** spec 文档第八章列出了 8 项体验设计补充建议（详见 [spec](../specs/2026-06-22-ai-interviewer-design.md#八体验设计补充建议mvp-后快速迭代)），MVP 不实现但需在架构层面预留接口：
+- **Barge-in**：WebSocket 管道支持"中断"消息类型，audioQueue 提供 clearQueue 接口（任务 4.1、5.3、5.4 已包含基础结构，后续可扩展）
+- **虚拟形象升级**：Avatar 组件抽象状态接口（idle/thinking/speaking），后续替换为 Live2D/VRM 渲染器时无需改调用方（任务 5.5）
+- **面试复盘**：会话内存字典保留完整 QA 记录，后续可直接用于回放页面（任务 4.1 的 session 数据结构已包含）
+- **种子题库**：prompt 模板预留题库注入点（任务 2.1 的 SYSTEM_PROMPT_TEMPLATE 已有配置字段）
+
 ---
 
 *计划完成，等待执行握手。*
