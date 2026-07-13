@@ -1,46 +1,123 @@
 # VoxHire
 
-VoxHire 是面向中文软件开发求职者的 AI 语音模拟面试 Demo。网页端支持本地语音网关模式与无需模型的静态演示模式；简历、JD、音频均不在服务端持久化。
+VoxHire 是一个面向中文软件开发求职者的 AI 语音模拟面试 Demo。用户填写目标岗位、经验与技术栈后，可完成一场 5 题模拟面试，并获得技术准确性、项目深度、问题分析、系统设计、表达清晰度、沟通协作和改进建议七维报告。
 
-## 开发
+当前版本以验证“配置 -> 面试 -> 复盘”的可体验闭环为目标。企业题库、账号体系、历史云端存储、在线编程、企业端筛选和生产级部署仍未实现。
+
+## 功能
+
+- 演示数据模式：无需密钥、模型或语音设备，即可体验完整的面试与报告页面。
+- 本地语音模式：中文 Paraformer ASR、本地 speech-to-speech 网关、OpenAI 兼容 LLM 与 Edge TTS 语音播放。
+- 面试流程：5 道岗位相关问题；按住说话，松开后提交本轮回答；每轮完成后推进进度。
+- 隐私：简历、JD、音频仅用于当前会话，后端不做持久化；已完成记录仅保存在浏览器 IndexedDB。
+
+## 技术栈
+
+- 前端：React 19、Vite、TypeScript、Lucide
+- 后端：FastAPI、Pydantic、pypdf
+- 语音网关：[huggingface/speech-to-speech](https://github.com/huggingface/speech-to-speech) 的 OpenAI Realtime WebSocket 协议
+- 语音：Paraformer 中文 ASR、Edge TTS 中文语音
+- 测试：pytest、Playwright
+
+## 环境要求
+
+- Windows 10/11（当前脚本已在 Windows 环境开发）
+- Node.js 20 或更高版本
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+- 真实语音模式还需要可用麦克风、网络，以及一个 OpenAI Chat Completions 兼容的 LLM API
+
+GPU 不是必需条件。CPU 是默认且已验证的路径；`RTX 3050 4GB` 可使用实验性 CUDA 环境加速 ASR，但 Edge TTS 仍通过网络服务合成语音。
+
+## 快速开始
+
+### 1. 安装依赖
+
+在项目根目录执行：
 
 ```powershell
 npm install
 uv sync
+npx playwright install chromium
+```
+
+### 2. 启动演示数据模式
+
+分别打开两个 PowerShell 窗口：
+
+```powershell
+# 终端 1：FastAPI 后端
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
+```
+
+```powershell
+# 终端 2：Vite 前端
 npm run dev
 ```
 
-打开 `http://localhost:5173`。默认进入演示数据模式，不依赖语音模型。
+打开 http://127.0.0.1:5173。默认是“演示数据模式”，无需 `.env`、LLM 密钥或语音网关。
 
-## 本地语音模式
+### 3. 启动真实本地语音模式（可选）
 
-语音网关由项目内 `.venv` 隔离管理。复制 `.env.example` 为根目录 `.env`，填入 OpenAI 兼容的 LLM 地址、密钥和模型名，然后运行：
+先复制并编辑环境变量文件：
 
 ```powershell
-.\scripts\start-gateway.ps1       # CPU 默认路径
-.\scripts\start-gateway-gpu.ps1   # RTX 3050 4GB 的试验性 CUDA 路径
+Copy-Item .env.example .env
 ```
 
-Paraformer 中文 ASR 已在 Windows CPU 完成真实转写验证，权重隔离在项目 `.cache/`。语音合成使用 `edge-tts` 的中文神经语音，通过本地适配器接入上游网关；它需要网络访问微软 Edge 语音服务，但不下载或保存 TTS 模型。GPU 环境仍可用于后续本地 TTS 实验：
+在 `.env` 中填写以下三项，不要将 `.env` 提交到 Git：
+
+```dotenv
+VOXHIRE_LLM_BASE_URL=https://api.example.com/v1
+VOXHIRE_LLM_API_KEY=replace-with-your-api-key
+VOXHIRE_LLM_MODEL=your-model-name
+```
+
+再打开第三个 PowerShell 窗口启动语音网关：
+
+```powershell
+# CPU 默认路径
+.\scripts\start-gateway.ps1
+```
+
+网页中切换为“本地语音模式”，点击“测试连通性”确认 LLM 配置，再开始面试。网关地址默认为 `ws://127.0.0.1:8765/v1/realtime`；如需覆盖，设置前端环境变量 `VITE_SPEECH_GATEWAY_URL`。
+
+首次启动真实语音模式会下载 Paraformer 相关模型到 `.cache/`，请预留网络和磁盘空间。Edge TTS 不下载模型，但需要访问微软的语音服务。
+
+### GPU 实验路径
+
+确认 NVIDIA 驱动和 CUDA 运行环境可用后执行：
 
 ```powershell
 .\scripts\setup-gpu.ps1
 .\scripts\start-gateway-gpu.ps1
 ```
 
-该脚本安装 CUDA 12.8 版 PyTorch 到 `.venv-gpu`，不影响 `.venv` 的 CPU 依赖。4GB 显存下仅使用 0.6B 模型；启动时请关闭占用 GPU 的应用。设置 `VITE_SPEECH_GATEWAY_URL` 可覆盖网关地址。
+该路径使用独立的 `.venv-gpu`，不会覆盖 CPU 环境。若 GPU 初始化失败，请回退到 CPU 启动命令。
 
-该网关由 Apache-2.0 许可的 `huggingface/speech-to-speech` 提供，当前仅通过其公开 OpenAI Realtime 协议集成，未包含其源码或模型权重。
-
-## 检查
+## 常用命令
 
 ```powershell
+# 前端开发与生产构建
+npm run dev
 npm run build
+
+# 后端单元测试
 .\.venv\Scripts\python.exe -m pytest
+
+# 浏览器端到端测试
 npm run test:browser
 ```
 
-`test:browser` 使用 Playwright Chromium 检查默认演示模式、本地语音模式与浏览器控制台错误。
 
-正式提交可运行 `npm run build` 后压缩 `dist/`，作为可交互静态演示包。静态模式使用内置样例数据；真实语音模式用于本地现场演示。
+## 项目结构
+
+```text
+src/                 React 前端、面试流程和 WebSocket 客户端
+backend/             FastAPI 会话、简历提取、LLM 连通性和报告接口
+scripts/             语音网关、Edge TTS 适配与 GPU 环境脚本
+tests/               Python 单元测试
+e2e/                 Playwright 端到端测试
+public/              静态资源与录音 AudioWorklet
+```
+
