@@ -20,6 +20,18 @@ class SessionCreate(BaseModel):
     job_description: str = Field(default="", max_length=12000)
 
 
+class LlmConnectionRequest(BaseModel):
+    base_url: str = Field(min_length=8, max_length=500)
+    api_key: str = Field(min_length=1, max_length=500)
+    model: str = Field(min_length=1, max_length=200)
+
+
+class LlmConnectionResult(BaseModel):
+    ok: bool
+    message: str
+    model: str
+
+
 class SessionCreated(BaseModel):
     session_id: str
     gateway_instructions: str

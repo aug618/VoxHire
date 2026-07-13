@@ -35,6 +35,7 @@ export class SpeechGatewayClient {
   private stream: MediaStream | null = null;
   private playAt = 0;
   private configured = false;
+  private capturing = false;
 
   constructor(private readonly url: string, private readonly instructions: string, private readonly handlers: GatewayHandlers) {}
 
@@ -46,7 +47,9 @@ export class SpeechGatewayClient {
     this.audioContext = new AudioContext();
     await this.audioContext.audioWorklet.addModule("/mic-worklet.js");
     this.captureNode = new AudioWorkletNode(this.audioContext, "voxhire-mic-capture");
-    this.captureNode.port.onmessage = (event) => this.sendAudio(event.data as ArrayBuffer);
+    this.captureNode.port.onmessage = (event) => {
+      this.sendAudio(event.data as ArrayBuffer);
+    };
     const source = this.audioContext.createMediaStreamSource(this.stream);
     source.connect(this.captureNode);
 
@@ -61,7 +64,8 @@ export class SpeechGatewayClient {
   }
 
   setCapturing(value: boolean): void {
-    if (!this.configured) return;
+    if (!this.configured || this.capturing === value) return;
+    this.capturing = value;
     this.captureNode?.port.postMessage({ type: "capture", value });
     this.handlers.onStatus(value ? "listening" : "thinking");
   }
@@ -73,6 +77,7 @@ export class SpeechGatewayClient {
     this.socket?.close();
     this.captureNode = null;
     this.socket = null;
+    this.capturing = false;
   }
 
   private sendAudio(buffer: ArrayBuffer): void {
@@ -85,10 +90,18 @@ export class SpeechGatewayClient {
     if (type === "session.created") {
       this.socket?.send(JSON.stringify({
         type: "session.update",
-        session: { type: "realtime", instructions: this.instructions },
+        session: {
+          type: "realtime",
+          instructions: this.instructions,
+          audio: {
+            input: {
+              turn_detection: { type: "server_vad", silence_duration_ms: 1500 },
+            },
+          },
+        },
       }));
       this.configured = true;
-      this.handlers.onStatus("ready");
+      this.handlers.onStatus("speaking");
       this.socket?.send(JSON.stringify({ type: "response.create" }));
       return;
     }

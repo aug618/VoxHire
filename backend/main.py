@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 from io import BytesIO
+import os
+
+import httpx
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
+from dotenv import load_dotenv
 
-from .models import InterviewReport, SessionCreate, SessionCreated, TranscriptBatch
+from .llm import test_openai_compatible_connection
+from .models import InterviewReport, LlmConnectionRequest, LlmConnectionResult, SessionCreate, SessionCreated, TranscriptBatch
 from .service import InterviewService
 
 app = FastAPI(title="VoxHire API", version="0.1.0")
+load_dotenv()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -22,6 +28,18 @@ service = InterviewService()
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/llm/test", response_model=LlmConnectionResult)
+async def test_llm() -> LlmConnectionResult:
+    """Tests the root .env configuration used by the voice gateway."""
+    base_url = os.getenv("VOXHIRE_LLM_BASE_URL", "")
+    api_key = os.getenv("VOXHIRE_LLM_API_KEY", "")
+    model = os.getenv("VOXHIRE_LLM_MODEL", "")
+    if not base_url or not api_key or not model:
+        return LlmConnectionResult(ok=False, message="根目录 .env 缺少 LLM 配置。", model=model or "未配置")
+    return await test_openai_compatible_connection(LlmConnectionRequest(base_url=base_url, api_key=api_key, model=model))
+
 
 
 @app.post("/api/sessions", response_model=SessionCreated)

@@ -1,4 +1,4 @@
-import type { InterviewReport, SessionCreated, SetupData, TranscriptEntry } from "../types";
+import type { InterviewReport, LlmConnectionResult, SessionCreated, SetupData, TranscriptEntry } from "../types";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -46,4 +46,8 @@ export async function extractPdf(file: File): Promise<string> {
   form.append("file", file);
   const result = await request<{ text: string }>("/api/resume/extract", { method: "POST", body: form });
   return result.text;
+}
+
+export function testLlmConnection(): Promise<LlmConnectionResult> {
+  return request<LlmConnectionResult>("/api/llm/test", { method: "POST" });
 }

@@ -9,6 +9,12 @@ export interface SetupData {
   jobDescription: string;
 }
 
+export interface LlmConnectionResult {
+  ok: boolean;
+  message: string;
+  model: string;
+}
+
 export interface TranscriptEntry {
   role: "user" | "assistant";
   text: string;

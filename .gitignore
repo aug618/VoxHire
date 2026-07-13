@@ -14,6 +14,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.cache/
 
 # Packaging and build artifacts
 build/
@@ -40,6 +41,10 @@ htmlcov/
 .env
 .env.*
 !.env.example
+
+# Playwright output
+test-results/
+playwright-report/
 
 # IDE and operating-system files
 .vscode/
